@@ -1,0 +1,956 @@
+================================================================
+TECH STACK PRD — APEX SPORTS INTELLIGENCE PLATFORM
+Architecture : Microservices
+Frontend     : Next.js 14 (JSX only, no TypeScript)
+Mobile       : Flutter (Dart)
+Database     : MongoDB + Firebase
+AI           : Ollama (local LLM, self-hosted)
+Version      : FINAL 1.0
+================================================================
+
+
+================================================================
+SECTION 1: WHY MICROSERVICES GETS YOU HIRED
+================================================================
+
+A monolith says "I can build an app."
+Microservices says "I understand how Uber, Nike, and Google
+actually ship software."
+
+Each service in Apex:
+  - Has one job and does it well
+  - Deploys independently — update AI without touching scores
+  - Fails independently — if notifications crash, live scores
+    still work
+  - Scales independently — spin up more match service pods
+    during a Champions League final
+
+This is the architecture pattern that senior engineers at
+real companies work on every day. Showing it in a portfolio
+project puts you in a completely different category from
+every other frontend developer applying for the same role.
+
+
+================================================================
+SECTION 2: SYSTEM ARCHITECTURE MAP
+================================================================
+
+                        CLIENT LAYER
+          ┌─────────────────┬──────────────────┐
+          │  Next.js Web    │  Flutter Mobile  │
+          │  (JSX, no TS)   │  (Dart)          │
+          └────────┬────────┴────────┬─────────┘
+                   │                 │
+                   ▼                 ▼
+                ┌─────────────────────┐
+                │    API GATEWAY      │  ← single entry point
+                │    (Express.js)     │    routes all traffic
+                │    Port 4000        │    auth middleware
+                └──────────┬──────────┘
+                           │
+        ┌──────────────────┼───────────────────┐
+        │          ┌───────┴──────┐            │
+        ▼          ▼              ▼            ▼
+  ┌──────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
+  │  Match   │ │ Player │ │   AI     │ │  User    │
+  │ Service  │ │Service │ │ Service  │ │ Service  │
+  │ :4001    │ │ :4002  │ │ :4003    │ │ :4004    │
+  └────┬─────┘ └───┬────┘ └────┬─────┘ └────┬─────┘
+       │            │           │             │
+       ▼            ▼           ▼             ▼
+  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐
+  │ MongoDB │ │ MongoDB │ │  Ollama │ │ MongoDB  │
+  │ matches │ │ players │ │ :11434  │ │  users   │
+  └─────────┘ └─────────┘ └─────────┘ └──────────┘
+                   │
+                   ▼
+            ┌─────────────┐
+            │  NOTIF       │
+            │  SERVICE     │
+            │  :4005       │
+            │  Firebase    │
+            │  FCM         │
+            └─────────────┘
+
+Message broker between services:
+  Redis pub/sub (Upstash free tier)
+  Match service publishes events → Notification service
+  subscribes and fires push notifications
+
+
+================================================================
+SECTION 3: MONOREPO STRUCTURE
+================================================================
+
+apex/
+  apps/
+    web/                  — Next.js 14 web app (JSX)
+    mobile/               — Flutter app (Dart)
+  services/
+    gateway/              — API Gateway (Express.js)
+    match-service/        — live scores, events, stats
+    player-service/       — player profiles, CSPI engine
+    ai-service/           — Ollama integration, AI tactician
+    user-service/         — auth, follows, preferences
+    notification-service/ — Firebase FCM, push alerts
+  packages/
+    shared/               — shared JS constants, formatters
+  docker/
+    docker-compose.yml    — run all services locally
+    ollama/
+      Modelfile           — custom Ollama model config
+  scripts/
+    seed.js               — seed MongoDB with sample data
+    start-dev.sh          — start all services in dev mode
+  .env.example
+  package.json            — root workspace (npm workspaces)
+
+
+================================================================
+SECTION 4: API GATEWAY
+================================================================
+
+Location: services/gateway/
+Port: 4000
+Framework: Express.js
+
+This is the ONLY service the clients talk to.
+Clients never call individual services directly.
+
+Responsibilities:
+  - Verify Firebase ID token on every protected request
+  - Route requests to correct downstream service
+  - Rate limiting per IP (express-rate-limit)
+  - Request logging (morgan)
+  - CORS for web and mobile origins
+  - WebSocket proxy for live match connections
+
+Routing table:
+  /api/matches/*        → match-service:4001
+  /api/players/*        → player-service:4002
+  /api/ai/*             → ai-service:4003
+  /api/users/*          → user-service:4004
+  /api/notifications/*  → notification-service:4005
+  /ws/live/:matchId     → match-service:4001 (WS)
+
+Files:
+  gateway/
+    src/
+      index.js          — Express app + WebSocket proxy
+      middleware/
+        auth.js         — Firebase Admin SDK token verify
+        rateLimit.js    — express-rate-limit config
+        cors.js         — allowed origins
+        logger.js       — morgan request logging
+      routes/
+        proxy.js        — http-proxy-middleware per service
+      config/
+        services.js     — service URLs from env variables
+
+Key packages:
+  express
+  http-proxy-middleware — proxy HTTP to downstream services
+  firebase-admin        — token verification
+  express-rate-limit
+  morgan
+  cors
+  ws                    — WebSocket proxy
+
+
+================================================================
+SECTION 5: MATCH SERVICE
+================================================================
+
+Location: services/match-service/
+Port: 4001
+Framework: Express.js
+Database: MongoDB (matches collection)
+
+This service owns everything about a match.
+It is the most critical service in the system.
+
+Endpoints:
+  GET  /matches             list live + upcoming matches
+  GET  /matches/:id         full match detail
+  GET  /matches/:id/stats   detailed stats
+  GET  /matches/:id/events  event timeline
+  GET  /matches/:id/momentum momentum array
+  GET  /live                currently live matches only
+
+WebSocket server (same process):
+  ws://match-service:4001/live/:matchId
+  Rooms: Map of matchId → Set of ws clients
+  Gateway proxies client WS connections here
+
+Live data job (runs inside this service):
+  setInterval every 15 seconds
+  Fetches from sports APIs (API-Football, TheSportsDB)
+  Saves to MongoDB with TTL indexes
+  Broadcasts diffs to WebSocket rooms
+  Publishes GOAL / CARD events to Redis channel
+  "match-events" for notification service to consume
+
+MongoDB schema — matches collection:
+  _id           String (external API match ID)
+  sport         String
+  league        String
+  homeTeam      Object { id, name, logo, color }
+  awayTeam      Object { id, name, logo, color }
+  score         Object { home, away, ht }
+  status        String (live / finished / upcoming)
+  kickoff       Date
+  events        Array of event objects
+  stats         Object (possession, shots, passes etc)
+  momentum      Array of numbers (per minute)
+  fetchedAt     Date (TTL index: expire after 15 seconds)
+
+Files:
+  match-service/
+    src/
+      index.js
+      routes/matches.js
+      controllers/matchController.js
+      models/Match.js
+      services/
+        sportsApiService.js   — external API wrapper
+        livePoller.js         — 15s polling job
+        wsHub.js              — WebSocket room manager
+        redisPublisher.js     — publish events to Redis
+
+Key packages:
+  express
+  mongoose
+  ws
+  axios
+  @upstash/redis
+  node-cron
+  p-queue               — rate limit outbound API calls
+
+
+================================================================
+SECTION 6: PLAYER SERVICE
+================================================================
+
+Location: services/player-service/
+Port: 4002
+Framework: Express.js
+Database: MongoDB (players collection)
+
+Owns all player data and the CSPI engine.
+
+Endpoints:
+  GET  /players/:id               player profile
+  GET  /players/search?q=         search players
+  GET  /players/:id/form          last 10 match form
+  GET  /players/:id/career        career arc stats
+  GET  /cspi?a=:idA&b=:idB        cross-sport index compare
+
+CSPI Engine (services/cspiEngine.js):
+  Pure JavaScript scoring algorithm
+  6 dimensions: Speed, Creation, Efficiency,
+                Consistency, Impact, Clutch
+  Each dimension = formula using sport-specific stats
+  All normalized to 0–100 scale
+  Final CSPI = weighted average (weights from query params)
+  Results cached in MongoDB cspiCache collection for 24h
+
+MongoDB schema — players collection:
+  _id           String (external API player ID)
+  sport         String
+  name          String
+  position      String
+  nationality   String
+  club          Object
+  photo         String (Firebase Storage URL)
+  careerStats   Array (per season)
+  currentForm   Array (last 10 matches)
+  cspiScores    Object (pre-calculated dimensions)
+  fetchedAt     Date (TTL: 24 hours)
+
+Files:
+  player-service/
+    src/
+      index.js
+      routes/players.js
+      controllers/playerController.js
+      models/Player.js
+      services/
+        sportsApiService.js
+        cspiEngine.js
+
+
+================================================================
+SECTION 7: AI SERVICE — OLLAMA
+================================================================
+
+Location: services/ai-service/
+Port: 4003
+Framework: Express.js
+AI Runtime: Ollama (self-hosted, local LLM)
+
+This is the most unique part of the entire stack.
+Ollama runs open-source LLMs locally — no API key,
+no cost, no rate limits, no data sent to third parties.
+This is what companies like Nike and Apple do internally
+for data privacy. Showing this in a portfolio is rare.
+
+What is Ollama:
+  Ollama is a tool to run LLMs locally on your machine.
+  Download from: ollama.ai (free, open source)
+  Run a model: ollama pull llama3.2
+  It exposes a local HTTP API on port 11434
+  The AI service calls this local API
+
+Model selection (all free, run locally):
+  Primary:   llama3.2 (3B) — fast, fits 8GB RAM
+  Fallback:  phi3 (3.8B)   — Microsoft, very capable
+  Sports:    custom Modelfile fine-tuned on sports context
+
+Custom Modelfile (docker/ollama/Modelfile):
+  FROM llama3.2
+  SYSTEM """
+  You are Apex, an expert sports analyst AI.
+  You only answer questions about sports and match data.
+  You receive structured match data as context.
+  Keep answers under 3 paragraphs. Be direct and insightful.
+  Never make up statistics. Only use the data provided.
+  """
+  PARAMETER temperature 0.4
+  PARAMETER num_ctx 4096
+
+Endpoints:
+  POST /ai/ask         — ask question, SSE streaming response
+  POST /ai/summary     — generate match summary
+  GET  /ai/health      — check Ollama is running
+
+How /ai/ask works:
+  1. Receive: { matchId, question, sessionId }
+  2. Call match-service internally to get match data
+  3. Load last 5 messages from aiSessions in MongoDB
+  4. Build prompt: system + match context + history + question
+  5. POST to http://localhost:11434/api/chat with stream:true
+  6. Pipe Ollama token stream → SSE to client
+  7. Save completed exchange to MongoDB aiSessions
+
+Ollama API call (services/ollamaService.js):
+  fetch('http://localhost:11434/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'apex-sports',
+      messages: assembledMessages,
+      stream: true
+    })
+  })
+  Read body as ReadableStream, pipe to res (SSE)
+
+SSE to client:
+  res.setHeader('Content-Type', 'text/event-stream')
+  On each token chunk: res.write('data: ${token}\n\n')
+  On done: res.write('data: [DONE]\n\n')
+
+MongoDB schema — aiSessions collection:
+  _id          ObjectId
+  userId       String (from Firebase UID)
+  matchId      String
+  messages     Array [{ role, content, timestamp }]
+  createdAt    Date
+  updatedAt    Date
+
+Files:
+  ai-service/
+    src/
+      index.js
+      routes/ai.js
+      controllers/aiController.js
+      models/AiSession.js
+      services/
+        ollamaService.js      — Ollama API wrapper + stream
+        contextBuilder.js     — assemble match context prompt
+        matchClient.js        — internal call to match-service
+
+Key packages:
+  express
+  mongoose
+  node-fetch            — stream Ollama response
+  axios                 — call match-service internally
+
+Production Ollama hosting (free options):
+  Local machine during development: ollama serve
+  Google Colab (free GPU): run Ollama on Colab notebook,
+    expose via ngrok free tunnel, point ai-service to URL
+  Fly.io free tier: deploy Ollama as a Fly machine
+  This setup is a talking point in every interview
+
+
+================================================================
+SECTION 8: USER SERVICE
+================================================================
+
+Location: services/user-service/
+Port: 4004
+Framework: Express.js
+Database: MongoDB (users collection)
+Auth: Firebase Admin SDK
+
+Owns all user profile and preferences data.
+
+Endpoints:
+  GET  /users/me                  my profile
+  PUT  /users/me                  update profile
+  POST /users/me/follow/player    follow a player
+  DELETE /users/me/follow/player  unfollow
+  POST /users/me/follow/team      follow a team
+  GET  /users/me/feed             personalised match feed
+  PUT  /users/me/cspi-weights     save CSPI weight prefs
+  POST /users/me/device-token     register FCM device token
+
+Authentication:
+  All routes protected by auth middleware
+  Firebase ID token in Authorization header
+  Decoded uid used to find/create MongoDB user document
+
+MongoDB schema — users collection:
+  _id              ObjectId
+  firebaseUid      String, unique
+  email            String
+  displayName      String
+  avatar           String (Firebase Storage URL)
+  followedPlayers  Array [{ playerId, sport, addedAt }]
+  followedTeams    Array [{ teamId, sport, addedAt }]
+  deviceTokens     Array of FCM token strings
+  cspiWeights      Object (Speed, Creation, Efficiency etc)
+  createdAt        Date
+  updatedAt        Date
+
+Files:
+  user-service/
+    src/
+      index.js
+      routes/users.js
+      controllers/userController.js
+      models/User.js
+      middleware/auth.js   — service-level Firebase verify
+
+
+================================================================
+SECTION 9: NOTIFICATION SERVICE
+================================================================
+
+Location: services/notification-service/
+Port: 4005
+Framework: Express.js
+Push: Firebase Cloud Messaging (FCM)
+Broker: Redis pub/sub (subscribes to match events)
+
+Owns all push notifications and alert logic.
+Does not expose REST endpoints to clients.
+Listens to Redis channels published by match-service.
+
+Redis subscriptions:
+  Channel: "match-events"
+  Message format:
+    { type: "GOAL", matchId, team, player, minute }
+    { type: "KICKOFF", matchId, homeTeam, awayTeam }
+    { type: "FULLTIME", matchId, score }
+
+On receiving a message:
+  1. Query user-service: which users follow this team/player?
+  2. Get their FCM device tokens from MongoDB
+  3. Send FCM push notification via Firebase Admin SDK
+  4. Log notification sent
+
+FCM notification payload:
+  GOAL: "Messi scored in the 67th minute! Real Madrid 1-0"
+  KICKOFF: "Man City vs Arsenal has kicked off"
+  FULLTIME: "Final score: PSG 2-1 Bayern Munich"
+
+Weekly digest job (node-cron, runs Sunday 9am):
+  Fetch top moments from past week for each user's follows
+  Send FCM notification with weekly summary
+
+Files:
+  notification-service/
+    src/
+      index.js
+      services/
+        redisSubscriber.js  — subscribe to match-events
+        fcmService.js       — Firebase Admin SDK push sender
+        userClient.js       — internal call to user-service
+        digestJob.js        — weekly cron job
+      config/
+        firebase.js         — Admin SDK init
+
+Key packages:
+  express
+  firebase-admin
+  @upstash/redis
+  node-cron
+  axios
+
+
+================================================================
+SECTION 10: WEB FRONTEND — NEXT.JS 14 (JSX)
+================================================================
+
+Location: apps/web/
+Framework: Next.js 14 App Router
+Language: JavaScript + JSX only — zero TypeScript
+Styling: CSS Modules + global CSS variables
+
+All API calls go to Gateway (port 4000 in dev,
+production URL in env). Web never calls services directly.
+
+Folder structure:
+  app/
+    layout.jsx              — root layout, fonts, theme
+    page.jsx                — home / live hub (ISR 60s)
+    match/[id]/
+      page.jsx              — match command center (SSR)
+      loading.jsx           — streaming skeleton UI
+    player/[id]/
+      page.jsx              — player deep profile (SSR)
+    compare/
+      page.jsx              — CSPI screen (client only)
+    case-study/
+      page.jsx              — recruiter page (SSG)
+    login/
+      page.jsx
+    signup/
+      page.jsx
+
+  components/
+    match/
+      MatchCard.jsx
+      MomentumBar.jsx
+      EventFeed.jsx
+      ScoreHero.jsx
+    player/
+      PlayerChip.jsx
+      BiometricTimeline.jsx
+      CareerArc.jsx
+      FormDots.jsx
+    heatmap/
+      HeatmapCanvas.jsx     — WebGL via react-three-fiber
+      TimeScrubber.jsx
+      HeatmapFilters.jsx
+    ai/
+      AISidebar.jsx         — SSE stream consumer
+      MessageThread.jsx
+      SuggestionChips.jsx
+    ui/
+      StatCard.jsx
+      Badge.jsx
+      Button.jsx
+      Skeleton.jsx
+      ShareCard.jsx
+
+  hooks/
+    useMatch.js             — SWR match data
+    useLive.js              — WebSocket to gateway → match svc
+    usePlayer.js
+    useAI.js                — EventSource SSE stream
+    useAuth.js              — Firebase auth state
+
+  store/
+    store.js                — Zustand
+    liveSlice.js
+    matchSlice.js
+    aiSlice.js
+    userSlice.js
+
+  lib/
+    api.js                  — axios pointing to Gateway :4000
+    firebase.js             — Firebase client SDK init
+    formatters.js
+
+  styles/
+    globals.css             — CSS variables (design tokens)
+    tokens.css              — color, spacing, typography vars
+
+Rendering strategy:
+  / (home)       — ISR, revalidate 60s
+  /match/[id]    — SSR + client WebSocket after hydration
+  /player/[id]   — SSR, 5 min cache
+  /compare       — client-side only
+  /case-study    — SSG (never revalidates)
+
+Key packages:
+  next                    14.x
+  react                   18.x
+  react-dom               18.x
+  swr                     2.x
+  zustand                 4.x
+  axios                   1.x
+  firebase                10.x
+  @react-three/fiber      8.x
+  three                   0.128.x
+  framer-motion           11.x
+  lucide-react            latest
+  date-fns                3.x
+  clsx                    latest
+
+
+================================================================
+SECTION 11: MOBILE FRONTEND — FLUTTER (DART)
+================================================================
+
+Location: apps/mobile/
+Framework: Flutter 3.x
+Language: Dart
+State: Riverpod 2.x
+Navigation: GoRouter
+
+All API calls go to Gateway. Never to individual services.
+
+lib/
+  main.dart
+  screens/
+    home_screen.dart
+    match_screen.dart
+    heatmap_screen.dart
+    player_screen.dart
+    compare_screen.dart
+    ai_screen.dart
+    login_screen.dart
+  widgets/
+    match/
+      match_card.dart
+      momentum_bar.dart
+      score_hero.dart
+      event_feed.dart
+    player/
+      player_chip.dart
+      biometric_chart.dart  — fl_chart
+      form_dots.dart
+    heatmap/
+      pitch_canvas.dart     — CustomPainter
+      time_scrubber.dart
+    ai/
+      ai_chat_panel.dart
+      message_bubble.dart
+      suggestion_chips.dart
+    ui/
+      stat_card.dart
+      skeleton_loader.dart
+      share_card.dart
+  services/
+    api_service.dart        — Dio → Gateway
+    websocket_service.dart  — web_socket_channel → Gateway
+    ai_stream_service.dart  — SSE stream from Gateway
+    firebase_service.dart   — Auth + Storage + FCM
+  models/
+    match_model.dart
+    player_model.dart
+    user_model.dart
+    ai_message_model.dart
+  providers/
+    match_provider.dart
+    live_provider.dart
+    ai_provider.dart
+    auth_provider.dart
+  utils/
+    formatters.dart
+    constants.dart
+    theme.dart
+
+Key packages (pubspec.yaml):
+  flutter_riverpod          2.x
+  go_router                 13.x
+  dio                       5.x
+  web_socket_channel        2.x
+  fl_chart                  0.68.x
+  firebase_core             latest
+  firebase_auth             latest
+  firebase_storage          latest
+  firebase_messaging        latest
+  firebase_crashlytics      latest
+  cached_network_image      3.x
+  flutter_animate           4.x
+  share_plus                7.x
+  flutter_secure_storage    9.x
+  shimmer                   3.x
+  connectivity_plus         5.x
+  intl                      latest
+
+
+================================================================
+SECTION 12: INTER-SERVICE COMMUNICATION
+================================================================
+
+Synchronous (HTTP):
+  Gateway → any service: http-proxy-middleware
+  AI service → Match service: internal axios call
+    http://match-service:4001/matches/:id
+  Notification service → User service: internal axios call
+    http://user-service:4004/users/by-team/:teamId
+
+Asynchronous (Redis pub/sub via Upstash):
+  Match service PUBLISHES to "match-events" channel
+  Notification service SUBSCRIBES to "match-events"
+  This decouples the two — match service does not know or
+  care about notifications at all
+
+Why this matters to hiring managers:
+  This is event-driven architecture.
+  This is how Uber dispatches rides, how Nike processes
+  orders, how Apple pushes App Store updates.
+  You built a small version of it.
+
+Service discovery (dev):
+  Each service has a known port (4000–4005)
+  Gateway reads service URLs from environment variables
+  SERVICE_MATCH=http://localhost:4001
+  SERVICE_PLAYER=http://localhost:4002
+  SERVICE_AI=http://localhost:4003
+  SERVICE_USER=http://localhost:4004
+  SERVICE_NOTIF=http://localhost:4005
+
+Service discovery (production on Render.com):
+  Each service deployed as a separate Render Web Service
+  Internal URLs: https://apex-match-svc.onrender.com
+  Stored in Gateway environment variables
+
+
+================================================================
+SECTION 13: LOCAL DEVELOPMENT SETUP
+================================================================
+
+docker-compose.yml starts everything:
+  Services: gateway, match-svc, player-svc, ai-svc,
+            user-svc, notif-svc
+  Databases: MongoDB (local), Redis (local)
+  Ollama: separate container with GPU passthrough if available
+
+Without Docker (scripts/start-dev.sh):
+  Concurrently starts all 5 services + Next.js + Ollama
+  Each in its own terminal panel via concurrently package
+  npm run dev (root) → starts everything
+
+Ollama setup steps:
+  1. Install: curl -fsSL https://ollama.ai/install.sh | sh
+  2. Pull model: ollama pull llama3.2
+  3. Create custom model: ollama create apex-sports -f Modelfile
+  4. Serve: ollama serve (runs on :11434 automatically)
+  5. AI service points to http://localhost:11434
+
+Seed database:
+  node scripts/seed.js
+  Inserts sample matches, players, users into MongoDB
+  Allows local dev without hitting sports APIs
+
+
+================================================================
+SECTION 14: DEPLOYMENT — ALL FREE TIERS
+================================================================
+
+Each service = one Render.com free web service.
+
+Service deployments:
+  apex-gateway          render.com free  (always on: yes)
+  apex-match-svc        render.com free  (sleeps after 15min)
+  apex-player-svc       render.com free  (sleeps after 15min)
+  apex-ai-svc           render.com free  (sleeps after 15min)
+  apex-user-svc         render.com free  (sleeps after 15min)
+  apex-notif-svc        render.com free  (sleeps after 15min)
+
+Note: Render free services sleep after 15min inactivity.
+Gateway stays awake via a free UptimeRobot ping every 10min.
+Other services wake up on first proxied request (~30s).
+Document this honestly in the case study page.
+
+Web frontend:
+  Vercel hobby free — apex-sports.vercel.app
+
+Mobile:
+  Flutter build apk — direct APK for Android reviewers
+  TestFlight — iOS via free Apple developer account
+
+Databases:
+  MongoDB Atlas M0 — 512MB free, one shared cluster
+  Three databases on same cluster:
+    apex_matches, apex_players, apex_users, apex_ai
+  Upstash Redis — 10,000 commands/day free
+
+Ollama in production (free options):
+  Option A: Google Colab notebook + ngrok tunnel (free)
+  Option B: Fly.io free allowance (3 shared VMs)
+  Option C: Keep on local machine, demo live from laptop
+            (perfectly acceptable for a portfolio)
+
+Firebase:
+  Spark plan — free forever
+  Auth, Storage (5GB), FCM (unlimited pushes)
+
+Environment variables per service:
+  gateway:      FIREBASE_ADMIN_SDK, SERVICE_* URLs
+  match-svc:    MONGODB_URI, SPORTS_API_KEY, REDIS_URL
+  player-svc:   MONGODB_URI, SPORTS_API_KEY
+  ai-svc:       MONGODB_URI, OLLAMA_URL
+  user-svc:     MONGODB_URI, FIREBASE_ADMIN_SDK
+  notif-svc:    MONGODB_URI, FIREBASE_ADMIN_SDK, REDIS_URL
+  web:          NEXT_PUBLIC_GATEWAY_URL, NEXT_PUBLIC_FIREBASE_*
+
+
+================================================================
+SECTION 15: COMPLETE PACKAGE LIST
+================================================================
+
+GATEWAY (services/gateway/)
+  express
+  http-proxy-middleware
+  firebase-admin
+  express-rate-limit
+  morgan
+  cors
+  ws
+  dotenv
+
+MATCH SERVICE (services/match-service/)
+  express
+  mongoose
+  ws
+  axios
+  @upstash/redis
+  p-queue
+  node-cron
+  dotenv
+
+PLAYER SERVICE (services/player-service/)
+  express
+  mongoose
+  axios
+  dotenv
+
+AI SERVICE (services/ai-service/)
+  express
+  mongoose
+  node-fetch
+  axios
+  dotenv
+
+USER SERVICE (services/user-service/)
+  express
+  mongoose
+  firebase-admin
+  dotenv
+
+NOTIFICATION SERVICE (services/notification-service/)
+  express
+  firebase-admin
+  @upstash/redis
+  node-cron
+  axios
+  dotenv
+
+WEB (apps/web/)
+  next                  14.x
+  react                 18.x
+  react-dom             18.x
+  swr                   2.x
+  zustand               4.x
+  axios                 1.x
+  firebase              10.x
+  @react-three/fiber    8.x
+  three                 0.128.x
+  framer-motion         11.x
+  lucide-react          latest
+  date-fns              3.x
+  clsx                  latest
+
+MOBILE (apps/mobile/) — pubspec.yaml
+  flutter_riverpod      2.x
+  go_router             13.x
+  dio                   5.x
+  web_socket_channel    2.x
+  fl_chart              0.68.x
+  firebase_core         latest
+  firebase_auth         latest
+  firebase_storage      latest
+  firebase_messaging    latest
+  firebase_crashlytics  latest
+  cached_network_image  3.x
+  flutter_animate       4.x
+  share_plus            7.x
+  flutter_secure_storage 9.x
+  shimmer               3.x
+  connectivity_plus     5.x
+  intl                  latest
+
+ROOT DEV TOOLS
+  concurrently          — run all services in one terminal
+  eslint                — JS linting
+  prettier              — formatting
+  jest                  — testing
+  supertest             — API route testing
+
+
+================================================================
+SECTION 16: CASE STUDY PAGE — /case-study
+================================================================
+
+This is a public route in the Next.js app.
+No login required. Indexed by Google.
+Written like an engineering blog post, not a resume.
+
+Sections:
+  The problem — why existing sports dashboards fail
+  Architecture — diagram of all 6 microservices
+  Why microservices — what it taught me about real systems
+  Ollama integration — why local LLM, how streaming works
+  WebGL heatmap — instanced rendering, performance numbers
+  Flutter vs React Native — why I chose Flutter, tradeoffs
+  What broke — honest failure stories (shows maturity)
+  Benchmarks — load times, WebSocket latency, render FPS
+  What's next — roadmap, open source plans
+  GitHub + Live demo links
+  Contact / hire me section
+
+This page is the difference between a project and a story.
+Stories get shared. Stories get you interviews.
+Stories get you hired at Google, Apple, and Nike.
+
+
+================================================================
+SECTION 17: WHAT REAL COMPANIES SEE IN THIS PROJECT
+================================================================
+
+GOOGLE sees:
+  Microservices architecture — this is how Google runs Gmail,
+  Maps, and Search. You speak their language.
+  Flutter — Google built Flutter. An engineer using Flutter
+  shows alignment with Google's technical vision.
+  Ollama / local LLM — data privacy engineering, which is
+  a core concern at Google Cloud.
+
+APPLE sees:
+  Flutter targeting iOS — native performance, no JS bridge.
+  Firebase Crashlytics — production-quality mobile thinking.
+  Offline-first mobile design — a core Apple design principle.
+  Clean JSX component architecture with no TypeScript
+  shortcuts — discipline over tools.
+
+NIKE sees:
+  Real-time data at scale — Nike's apps serve millions during
+  product drops and live sporting events. You built a small
+  version of that infrastructure.
+  WebGL canvas — Nike's digital product team does heavy
+  interactive visualization work. This is that skill.
+  CSPI cross-sport index — original thinking applied to
+  athletic performance. Nike's entire brand is athletic
+  performance. You made a tool for it.
+
+ALL THREE see:
+  Event-driven architecture (Redis pub/sub)
+  Self-hosted AI (Ollama) — not just calling an API
+  A case study page — you can communicate engineering
+  decisions in writing, which is what senior engineers do
+  One GitHub repo that tells a complete story
+
+This is not a tutorial project.
+This is not a CRUD app.
+This is a system — and systems are what companies hire for.
+
+
+================================================================
+END OF FINAL TECH STACK PRD
+================================================================

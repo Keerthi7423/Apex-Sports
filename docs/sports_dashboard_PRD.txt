@@ -1,0 +1,226 @@
+================================================================
+PRODUCT REQUIREMENTS DOCUMENT
+PROJECT: APEX SPORTS INTELLIGENCE PLATFORM
+Version: 1.0
+Status: Draft
+================================================================
+
+
+1. PRODUCT OVERVIEW
+-------------------
+Apex is a real-time sports intelligence platform for web and
+mobile that transforms raw match and player data into stories,
+decisions, and experiences. It serves fans who want depth,
+analysts who want speed, and coaches who want answers.
+
+The product is built to prove full-stack engineering capability
+at a level that attracts engineering-led companies.
+
+
+2. PROBLEM STATEMENT
+--------------------
+Existing sports dashboards show numbers. They don't explain
+what the numbers mean, don't connect events across sports, and
+don't let users interact with data the way they think about a
+game — spatially, temporally, emotionally.
+
+Fans lose interest. Analysts switch to spreadsheets. Coaches
+hire separate tools. No single product owns the whole picture.
+
+
+3. TARGET USERS
+---------------
+Primary:
+  - Sports fans aged 18–35 who want more than a scoreboard
+  - Fantasy sports players who make data-driven decisions
+
+Secondary:
+  - Amateur coaches and team managers
+  - Sports journalists and content creators
+
+Aspirational (phase 2):
+  - Professional club analysts
+  - Broadcasters looking for real-time insight overlays
+
+
+4. GOALS
+--------
+Product goals:
+  G1. Become the most shared sports data product on social media
+  G2. Demonstrate full-stack engineering in one public repo
+  G3. Acquire 10,000 active users within 90 days of launch
+  G4. Generate at least 3 inbound recruiter contacts per month
+
+User goals:
+  G5. Understand a match in under 30 seconds
+  G6. Ask a question about a game and get a real answer
+  G7. See where things happened on the pitch, not just counts
+  G8. Compare players across different sports meaningfully
+
+
+5. NON-GOALS
+------------
+  - We are not building a betting or gambling product
+  - We are not licensing official broadcast rights
+  - We will not build team management or scheduling tools in v1
+  - We will not support e-sports in v1
+
+
+6. CORE FEATURES
+----------------
+
+FEATURE 1: LIVE MATCH COMMAND CENTER
+  - Real-time scoreline, timeline, and key event feed
+  - Momentum bar that shifts visually as the game progresses
+  - One-tap switch between all live matches globally
+  - Priority: P0
+
+FEATURE 2: BIOMETRIC NARRATIVE TIMELINE
+  - Per-player fatigue index, sprint count, and distance run
+  - Displayed as a living timeline, not a static table
+  - Visual decay curve showing physical output across match time
+  - Flags the moment a player's performance dropped and why
+  - Priority: P0
+
+FEATURE 3: SPATIAL HEATMAP CANVAS
+  - A full-pitch canvas where passes, shots, sprints are plotted
+  - Time scrubber — drag left/right to replay the match spatially
+  - Filter by player, event type, or team
+  - Pinch and zoom on mobile
+  - Priority: P0
+
+FEATURE 4: AI TACTICIAN SIDEBAR
+  - A natural language interface inside the dashboard
+  - User asks: "Why did they collapse in the second half?"
+  - System answers using actual match data from that game
+  - Remembers context within a session (conversational)
+  - Works for any match in the last 7 days
+  - Priority: P0
+
+FEATURE 5: CROSS-SPORT PERFORMANCE INDEX (CSPI)
+  - A unified efficiency score that works across sports
+  - Compares an NBA player's shot creation to an NFL receiver's
+    separation ability on the same 0–100 scale
+  - User can define the weighting of the index themselves
+  - First implementation of this concept anywhere
+  - Priority: P1
+
+FEATURE 6: PLAYER DEEP PROFILE
+  - Career arc visualization from debut to current form
+  - Form heatmap: last 10 matches performance grid
+  - Head-to-head comparison against any player in same sport
+  - Shareable card generated as image for social media
+  - Priority: P1
+
+FEATURE 7: SMART ALERTS
+  - User follows players and matches
+  - Push notification when a followed player hits a milestone
+  - Weekly digest email with top moments from followed teams
+  - Priority: P1
+
+FEATURE 8: CASE STUDY MODE
+  - A dedicated route inside the app (/case-study)
+  - Documents architecture decisions, performance benchmarks,
+    and product thinking behind each major feature
+  - Targeted at engineering recruiters and hiring managers
+  - Priority: P2
+
+
+7. USER FLOWS
+-------------
+
+FLOW A: NEW USER LANDS ON HOME
+  Land → see live matches → click one → Command Center loads
+  → momentum bar is already moving → user is hooked in 8 sec
+
+FLOW B: ANALYST DEEP DIVE
+  Search player → Deep Profile → switch to Heatmap Canvas
+  → scrub to minute 67 → open AI Sidebar → ask question
+  → share the answer card to Twitter
+
+FLOW C: CASUAL FAN ON MOBILE
+  Open app → notification: Messi just scored → tap → see the
+  goal plotted on the canvas → see his fatigue at that moment
+  → share the shareable card to WhatsApp group
+
+
+8. PLATFORM REQUIREMENTS
+-------------------------
+Web:
+  - Works in Chrome, Firefox, Safari (latest 2 versions)
+  - Fully responsive from 320px to 4K
+  - Core features load under 2 seconds on 4G
+
+Mobile (iOS and Android):
+  - Native-feeling app, shared codebase where possible
+  - Heatmap canvas supports touch gestures (pinch, drag, tap)
+  - Offline mode: last viewed match data cached locally
+  - Push notifications supported
+
+Performance benchmarks:
+  - Live data latency under 3 seconds from event to screen
+  - Heatmap canvas renders 10,000+ data points without lag
+  - AI Sidebar responds within 4 seconds
+
+
+9. CONTENT AND DATA
+-------------------
+Sports covered at launch:
+  - Football (soccer) — top 5 European leagues + Champions League
+  - Basketball — NBA
+  - Cricket — IPL and international (given Bengaluru user base)
+
+Data sourced from third-party sports APIs.
+All data display follows API provider terms.
+No raw data re-distribution.
+
+
+10. METRICS FOR SUCCESS
+------------------------
+Acquisition:
+  - GitHub stars: 500 in first 30 days
+  - Social media impressions: 100k in first 60 days
+
+Engagement:
+  - Average session length: over 4 minutes
+  - AI Sidebar queries per session: over 1.5
+  - Heatmap canvas interaction rate: over 40% of sessions
+
+Conversion (career goal):
+  - Inbound recruiter messages per month: 3+
+  - Companies that reference the project in interviews: track
+
+
+11. RISKS
+---------
+  R1. Sports API rate limits restrict live data freshness
+      Mitigation: Cache aggressively, use WebSockets where available
+
+  R2. AI Sidebar gives wrong tactical explanations
+      Mitigation: Ground all answers in actual data, add disclaimer
+
+  R3. WebGL canvas breaks on older mobile devices
+      Mitigation: Canvas fallback to SVG for low-end devices
+
+  R4. Project scope is too large to ship alone
+      Mitigation: Ship P0 features as v1, P1 as v2 post-launch
+
+
+12. PHASES
+----------
+Phase 1 — Foundation (weeks 1–4):
+  Live Command Center + Biometric Timeline + Heatmap Canvas
+
+Phase 2 — Intelligence (weeks 5–8):
+  AI Tactician Sidebar + Player Deep Profile
+
+Phase 3 — Differentiation (weeks 9–12):
+  Cross-Sport Performance Index + Shareable Cards + Case Study
+
+Phase 4 — Growth (post week 12):
+  Smart Alerts + Cricket data + open source release
+
+
+================================================================
+END OF DOCUMENT
+================================================================

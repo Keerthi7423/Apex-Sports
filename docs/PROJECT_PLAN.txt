@@ -1,0 +1,155 @@
+================================================================
+PROJECT PLAN: APEX SPORTS INTELLIGENCE PLATFORM (Microservices)
+Role: Full Stack & Mobile Lead
+Estimated Duration: 24 Days
+================================================================
+
+PHASE 1: INFRASTRUCTURE & GATEWAY (3 DAYS)
+----------------------------------------------------------------
+Day 1: Monorepo & Project Initialization
+- Create monorepo structure (apps/, services/, packages/).
+- Initialize root package.json and workspace configuration.
+- Set up shared packages for constants and utility formatters.
+- Configure global .env file and environment variables.
+
+Day 2: API Gateway - Core Routing
+- Initialize Express.js Gateway service on port 4000.
+- Implement http-proxy-middleware to route traffic to downstream services.
+- Add morgan logging and basic CORS configuration.
+- Implement rate-limiting middleware for API protection.
+
+Day 3: Firebase Auth & Gateway Middleware
+- Set up Firebase project and download Admin SDK credentials.
+- Implement auth.js middleware in Gateway to verify Firebase ID tokens.
+- Protect all sensitive routes behind the auth middleware.
+- Test terminal-to-gateway proxying routing Table.
+
+
+PHASE 2: BACKEND MICROSERVICES (7 DAYS)
+----------------------------------------------------------------
+Day 4: Match Service - Base & Schema
+- Initialize Match service with Express and MongoDB.
+- Define Match, Stat, and Event schemas.
+- Implement endpoints: GET /matches, GET /matches/:id.
+- Seed MongoDB with initial mock match data.
+
+Day 5: Match Service - Live Data & WebSockets
+- Implement sportsApiService.js (wrapper for external sports APIs).
+- Create livePoller.js cron job (15s polling) to fetch live scores.
+- Build wsHub.js for managing real-time WebSocket connections.
+- Ensure Gateway correctly proxies WS connections (/ws/live/:matchId).
+
+Day 6: Player Service & CSPI Engine
+- Initialize Player service and MongoDB connection.
+- Define Player schema (attributes, form, career stats).
+- Build the CSPI (Cross-Sport Index) Engine scoring algorithm.
+- Implement comparison endpoint: GET /cspi?a=:idA&b=:idB.
+
+Day 7: AI Service - Ollama Integration
+- Install and configure Ollama locally (Llama 3.2 model).
+- Build ai-service to wrap Ollama HTTP API.
+- Implement prompt engineering (contextBuilder.js) for sports analysis.
+- Implement /ai/ask endpoint with SSE (Server-Sent Events) for streaming responses.
+
+Day 8: User Service - Profile & Preferences
+- Initialize User service with Firebase Admin integration.
+- Implement User schema (followed players, teams, CSPI weights).
+- Build endpoints for following/unfollowing and updating profile.
+- Implement logic to store and retrieve FCM device tokens.
+
+Day 9: Notification Service - RabbitMQ Foundation
+- Set up RabbitMQ (Local/Docker) and establish connection.
+- Build rabbitPublisher.js in Match Service to emit "match.goal", "match.kickoff".
+- Build rabbitConsumer.js in Notification Service to listen for events.
+
+Day 10: Push Logic & Weekly Digest
+- Integrate Firebase Cloud Messaging (FCM) in Notification Service.
+- Implement user targeting logic (notif-svc calls user-svc for followers).
+- Build the cron job for the Weekly Top Moments digest.
+- End-to-end test: Publish event -> Consume -> Push Notif.
+
+
+PHASE 3: WEB FRONTEND - NEXT.JS (4 DAYS)
+----------------------------------------------------------------
+Day 11: Web Foundation & Auth
+- Initialize Next.js 14 app router project (apps/web).
+- Set up CSS Variables (Design Tokens) and Global Styles.
+- Implement useAuth hook and protected route logic with Firebase.
+- Build shared UI components (Button, Badge, Skeleton).
+
+Day 12: Match Command Center
+- Build Home Page (Live + Upcoming Match Grid) with ISR.
+- Build Match Detail Page (SSR) with real-time score updates.
+- Implement MomentumBar and EventFeed UI components.
+
+Day 13: Player Deep Profiles & Comparison
+- Build Player Profile Page with FormDots and CareerArc charts.
+- Implement Heatmap UI using @react-three/fiber (3D visualization).
+- Build the CSPI Comparison Dashboard with side-by-side stats.
+
+Day 14: AI Assistant & Stream Consumer
+- Design the AISidebar for match analysis.
+- Implement useAI hook to consume SSE stream from Gateway.
+- Add suggestion chips for smart follow-up questions.
+- Perform visual polish on all web transitions (Framer Motion).
+
+
+PHASE 4: MOBILE FRONTEND - FLUTTER (6 DAYS)
+----------------------------------------------------------------
+Day 15: Flutter Setup & Routing
+- Create Flutter app structure and pubspec.yaml setup.
+- Configure GoRouter for navigation and Riverpod for state management.
+- Set up Dio client with Gateway base URL and auth interceptors.
+
+Day 16: Mobile Auth & Home UI
+- Implement Firebase Auth (Google/Email) in Flutter.
+- Build the Home Screen with horizontal sports categories and live carousels.
+- Implement shimmer loading effects for all lists.
+
+Day 17: Match Center UI (Mobile)
+- Build the Match Detail Screen with sticky headers for scores.
+- Implement custom Momentum charts and live event timeline.
+- Integrate WebSocket connection for real-time mobile updates.
+
+Day 18: Player Profiles & Biometric Charts
+- Build Player Screen with fl_chart integration for form visualization.
+- Implement PlayerChip and StatCard reusable widgets.
+- Build the "Compare Players" search and result UI.
+
+Day 19: Mobile AI Chat & SSE
+- Build the AI Assistant chat interface.
+- Implement manual SSE streaming logic in Dart to handle Ollama tokens.
+- Ensure smooth scrolling and message bubble animations.
+
+Day 20: FCM Push Notifications (Mobile)
+- Integrate firebase_messaging in Dart.
+- Implement foreground and background notification handlers.
+- Add deep-linking logic (Notif click -> Open specific Match Screen).
+
+
+PHASE 5: DEPLOYMENT & DEVOPS (4 DAYS)
+----------------------------------------------------------------
+Day 21: Containerization (Docker)
+- Write Dockerfiles for all 6 Node.js services and the Next.js app.
+- Create master docker-compose.yml for local full-stack orchestration.
+- Build and test the entire stack locally via Docker.
+
+Day 22: AWS Infrastructure Setup
+- Launch EC2 (t2.micro) and configure Elastic Static IP.
+- Create ECR repositories for each microservice image.
+- Configure Nginx as a reverse proxy with SSL (Certbot) on the EC2.
+
+Day 23: CI/CD Pipeline (GitHub Actions)
+- Build ci.yml for automated linting and unit testing.
+- Build deploy.yml to: Build images -> Push to ECR -> SSH to EC2 -> Pull & Restart.
+- Verify zero-downtime deployment flow.
+
+Day 24: Final UAT & Portfolio Packaging
+- Seed production database with realistic match/player data.
+- Conduct final end-to-end testing (Mobile -> Gateway -> Microservices -> Notif).
+- Write the final Case Study/Documentation (system architecture, trade-offs).
+- Deliver final PROJECT_PLAN.txt and repository to the User.
+
+================================================================
+END OF PLAN
+================================================================

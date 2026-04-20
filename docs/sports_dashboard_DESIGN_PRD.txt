@@ -1,0 +1,566 @@
+================================================================
+DESIGN PRD — APEX SPORTS INTELLIGENCE PLATFORM
+Version: 1.0  |  Scope: Web + Mobile  |  Tools: Free only
+================================================================
+
+
+NOTE ON PINTEREST LINK
+----------------------
+Pinterest requires login to view pins, so the image could not
+be loaded. This design PRD is built from scratch based on the
+best sports dashboard design patterns from Dribbble, Behance,
+and Apple Sports — elevated with unique decisions for Apex.
+
+
+================================================================
+SECTION 1: DESIGN PHILOSOPHY
+================================================================
+
+One sentence: Data should feel alive, not archived.
+
+Four principles that govern every decision:
+
+  KINETIC — Everything that can move, moves. Stats don't just
+  appear, they count up. Cards don't just load, they slide in.
+  The dashboard breathes.
+
+  SPATIAL — Information has a place on the page the same way
+  players have a position on the pitch. The layout teaches
+  users where to look without a tutorial.
+
+  HONEST — No decorative gradients that mean nothing. Every
+  color encodes something. Every animation has a purpose.
+  If you can remove it without losing meaning, remove it.
+
+  CINEMATIC — The product should feel like watching a match
+  broadcast, not reading a spreadsheet. Typography is bold.
+  Whitespace is generous. The hero number on any screen is
+  always the largest thing on the page.
+
+
+================================================================
+SECTION 2: COLOR SYSTEM
+================================================================
+
+Primary palette — dark mode first (this is a sports product,
+dark mode is the default, light mode is the secondary option):
+
+  PITCH BLACK     #0D0D0F   — page background
+  SURFACE         #161618   — card background
+  SURFACE RAISED  #1E1E21   — elevated cards, modals
+  BORDER          #2A2A2E   — all borders and dividers
+
+Accent — one signature color only:
+  APEX GREEN      #00FF87   — the brand color
+                              used for: live indicators,
+                              active states, key stats,
+                              CTA buttons, momentum bar fill
+                              NEVER used as background fill
+                              on large areas
+
+Semantic colors:
+  WIN / POSITIVE  #00C170   — goals, positive stats
+  LOSS / NEGATIVE #FF4D4D   — errors, negative deltas
+  WARNING         #FFB020   — yellow cards, caution
+  INFO            #4D9EFF   — informational labels
+
+Text hierarchy:
+  PRIMARY TEXT    #F5F5F5   — headings, hero numbers
+  SECONDARY TEXT  #9A9A9F   — labels, supporting info
+  MUTED TEXT      #5A5A62   — timestamps, metadata
+
+Light mode overrides:
+  Background      #F4F4F6
+  Surface         #FFFFFF
+  Surface Raised  #F0F0F4
+  Border          #E2E2E8
+  Primary text    #0D0D0F
+  Secondary text  #5A5A62
+  Apex Green stays the same in both modes
+
+
+================================================================
+SECTION 3: TYPOGRAPHY
+================================================================
+
+Free font stack — Google Fonts only:
+
+  DISPLAY / HERO NUMBERS   — "Barlow Condensed" Bold 700
+    Use for: scoreboards, stat hero numbers, match timer
+    Sizes: 64px (scoreboard), 48px (hero stat), 32px (section)
+
+  HEADINGS / LABELS        — "Inter" SemiBold 600
+    Use for: card titles, player names, nav items
+    Sizes: 20px (card title), 16px (label), 14px (badge)
+
+  BODY / DATA              — "Inter" Regular 400
+    Use for: descriptions, metadata, table rows
+    Sizes: 14px (body), 12px (caption)
+
+  MONO / LIVE DATA         — "JetBrains Mono" Regular
+    Use for: timers counting up, live stat numbers changing
+    Ensures no layout shift when digits change width
+
+Sizing scale (rem based):
+  3rem    — hero numbers (scoreboard)
+  2rem    — section hero stat
+  1.25rem — card title
+  1rem    — body
+  0.875rem — label / caption
+  0.75rem  — badge / metadata
+
+Line height: 1.2 for headings, 1.6 for body.
+Letter spacing: -0.02em on display sizes (tightens impact).
+Numbers always tabular: font-variant-numeric: tabular-nums
+
+
+================================================================
+SECTION 4: SPACING AND GRID
+================================================================
+
+Base unit: 4px. Everything is a multiple of 4.
+
+Spacing tokens:
+  xs    4px
+  sm    8px
+  md    16px
+  lg    24px
+  xl    32px
+  2xl   48px
+  3xl   64px
+
+Web grid:
+  Max content width: 1440px
+  Columns: 12
+  Gutter: 24px
+  Margin: 32px on each side
+
+Layout zones (web):
+  Left sidebar nav: 72px wide (icon only), expands to 240px
+  Main content area: fills remaining width
+  Right panel (AI sidebar): 360px, slides in over content
+
+Mobile grid:
+  Columns: 4
+  Gutter: 16px
+  Margin: 16px
+
+Breakpoints:
+  Mobile:   320px – 767px
+  Tablet:   768px – 1023px
+  Desktop:  1024px – 1439px
+  Wide:     1440px+
+
+
+================================================================
+SECTION 5: COMPONENT LIBRARY
+================================================================
+
+--- 5.1 NAVIGATION ---
+
+Web sidebar (collapsed default):
+  72px wide strip
+  Top: Apex logo mark (A in green circle)
+  Items: icon only, tooltip on hover
+  Active state: left border 2px Apex Green, icon turns green
+  Bottom: user avatar, settings icon
+  Expanded: 240px, shows labels next to icons
+  Expansion trigger: hover on desktop, tap on mobile
+
+Mobile bottom nav:
+  5 items: Home, Live, Search, Players, Profile
+  Active tab: icon + label, Apex Green
+  Inactive: icon only, muted color
+  Height: 64px + safe area inset
+
+
+--- 5.2 MATCH CARD ---
+
+Size: full width of column on mobile, 380px min on web
+Structure top to bottom:
+  League badge + league name (12px, muted)
+  Team A logo — Score — Team B logo (hero area)
+  Score: 48px Barlow Condensed, white
+  Team names: 14px Inter, secondary text
+  Status pill: LIVE (green pulsing dot), HT, FT, kickoff time
+  Bottom strip: top 3 key events as icon + minute
+
+Live card: left border 2px solid Apex Green
+           subtle green glow on border (2px blur only)
+Finished card: no border accent, scores slightly muted
+
+
+--- 5.3 STAT CARD ---
+
+Used for: possession, shots, passes, distance run, etc.
+Structure:
+  Label (12px, muted)
+  Value (32px, Barlow Condensed, white)
+  Delta indicator: up/down arrow + percentage (12px)
+  Sparkline: 40px tall mini line chart at bottom
+
+Cards sit in a 2-column grid on mobile, 4-column on web.
+
+
+--- 5.4 PLAYER CHIP ---
+
+Compact component used in lists and heatmap filters:
+  Player photo (32px circle, fallback = initials)
+  Name (14px)
+  Jersey number badge (12px, team color background)
+  Form dots: 5 dots, green = good, red = poor, gray = neutral
+  Tap expands to Player Deep Profile
+
+
+--- 5.5 MOMENTUM BAR ---
+
+Full-width horizontal bar below scoreline
+Left half = Team A, right half = Team B
+Fill animates in real time as match events happen
+Color: Team A uses their kit color, Team B uses theirs
+Center line marks 50/50
+Tooltip on hover: "Team A dominated since 65'"
+
+
+--- 5.6 AI SIDEBAR PANEL ---
+
+Slides in from right (web) or bottom sheet (mobile)
+Width: 360px (web), full screen (mobile)
+Structure:
+  Header: "AI Tactician" + match title + close X
+  Message thread (scrollable)
+  User messages: right-aligned, green bubble
+  AI messages: left-aligned, surface raised bg
+  Input: sticky bottom, "Ask about this match..." placeholder
+  Suggestion chips above input on first open:
+    "Why did they lose the 2nd half?"
+    "Who was the best player?"
+    "What changed after the substitution?"
+
+Typing indicator: three pulsing dots in AI bubble
+
+
+--- 5.7 HEATMAP CANVAS ---
+
+Full-width component, 16:9 ratio minimum
+Pitch rendered as dark green surface, white line markings
+Event dots:
+  Pass:  2px white dot
+  Shot:  6px white circle, hollow
+  Goal:  8px Apex Green circle, filled
+  Sprint trail: 1px line, fades from white to transparent
+
+Time scrubber:
+  Horizontal slider below canvas
+  Drag handle: 20px circle
+  Tooltip above handle: "67:23"
+  Play/pause button left of scrubber
+
+Filter row above canvas:
+  "All players" dropdown
+  Event type pills: All / Passes / Shots / Sprints / Goals
+  Team toggle: Team A / Both / Team B
+
+
+--- 5.8 BIOMETRIC TIMELINE ---
+
+Horizontal scrollable timeline per player
+Y axis: performance index 0–100
+X axis: match minutes 0–90+
+Line chart with:
+  Area fill under the line (low opacity, team color)
+  Marker dots at substitution, goal, card events
+  Fatigue threshold line: dashed at 40% index
+  Below 40%: line turns from team color to orange-red
+
+On mobile: full-width horizontal scroll, two-finger zoom
+
+
+--- 5.9 SHAREABLE CARD ---
+
+Generated image for social media export
+Fixed size: 1080x1080 (square), 1080x1920 (story)
+Layout:
+  Apex logo top-right watermark
+  Player photo (large, centered)
+  Key stat: hero number + label
+  Match context: opponent, score, date
+  Background: player's team gradient (subtle, behind photo)
+  Bottom strip: apexsports.app URL
+Format: exported as PNG via canvas API (free, no library)
+
+
+================================================================
+SECTION 6: SCREEN DESIGNS
+================================================================
+
+--- SCREEN 1: HOME / LIVE HUB ---
+
+Web layout:
+  Left sidebar (collapsed)
+  Main area, 3 columns:
+    Column 1 (4/12): Featured match card (large)
+    Column 2-3 (8/12): Live match grid + top stories
+
+Featured match card:
+  Full height left column
+  Large team logos
+  Animated momentum bar
+  Live score in 64px Barlow Condensed
+
+Live match grid (right area):
+  2-column grid of standard match cards
+  Filter row: All / Football / Basketball / Cricket
+  "4 more live" collapsed expand button
+
+Mobile layout:
+  Horizontal scroll strip of live match cards (peek 20px)
+  Featured match full width below
+  Vertical list of upcoming matches
+
+
+--- SCREEN 2: MATCH COMMAND CENTER ---
+
+Web layout (after clicking a match):
+  Top bar: breadcrumb + live timer (JetBrains Mono, counting)
+  Hero row: Team A | Score | Team B  (full width, 80px score)
+  Momentum bar below hero row
+  Tabs below: Overview / Heatmap / Players / Timeline / AI
+
+Overview tab:
+  2x4 grid of stat cards
+  Event timeline: vertical list, left = Team A, right = Team B
+  Events: goals, cards, subs as icons + player name + minute
+
+Heatmap tab:
+  Full heatmap canvas component
+  Filter row
+  Time scrubber
+
+Players tab:
+  Left: Team A list, Right: Team B list
+  Each row = player chip + 4 key stats for that match
+  Tap any player opens Player Deep Profile sheet
+
+Timeline tab:
+  Biometric timeline for each player
+  Team filter at top
+
+AI tab:
+  Full AI Tactician sidebar (full width on this tab, not panel)
+
+Mobile layout:
+  Tabs become horizontal scroll tab bar
+  Each tab is full screen vertically
+  Heatmap canvas is horizontal scroll fullscreen with pinch zoom
+
+
+--- SCREEN 3: PLAYER DEEP PROFILE ---
+
+Enters as a bottom sheet on mobile, right panel on web
+
+Header:
+  Player photo (96px circle)
+  Name (24px), position badge, nationality flag
+  Current club logo + jersey number
+
+Section: Current form
+  5-match mini scorecards in a row
+  Each: opponent logo + performance dot (green/amber/red)
+
+Section: Career arc
+  Line chart, x = seasons, y = rating/index
+  Highlight dot at career peak, annotated
+
+Section: This match
+  Biometric timeline for this player only
+  Key stats: 4 large stat cards in 2x2 grid
+
+Section: Head to head compare
+  Search another player input
+  Two-column stat comparison on submit
+
+Footer:
+  "Share card" button (generates shareable card)
+  "Follow player" toggle
+
+
+--- SCREEN 4: CROSS-SPORT INDEX (CSPI) ---
+
+Unique screen, no equivalent exists anywhere
+
+Top: Explainer strip "What is CSPI?" with 1-sentence answer
+     and a "?" icon that opens a tooltip
+
+Search: two search inputs — "Player A" vs "Player B"
+        each autocompletes across all sports
+
+Result:
+  Large circular gauge for each player (0–100 CSPI)
+  Breakdown spider/radar chart: 6 dimensions
+    (Speed, Creation, Efficiency, Consistency, Impact, Clutch)
+  Narrative sentence below:
+    "Messi's creation output in 2024 equates to Cooper Kupp's
+     route separation efficiency in the NFL."
+
+Sliders: user adjusts weight of each dimension
+         CSPI scores update in real time as sliders move
+
+Share button: exports comparison as image card
+
+
+--- SCREEN 5: CASE STUDY (RECRUITER PAGE) ---
+
+Route: /case-study
+No login required, always public
+
+Layout: long-form editorial, centered column 720px max-width
+Dark background, large typography, code snippets where relevant
+
+Sections:
+  The problem I set out to solve
+  Architecture decisions (with diagram)
+  The heatmap canvas — how I built it
+  AI integration — how the tactician works
+  Performance benchmarks — before and after
+  What I learned
+  Links: GitHub, live demo, contact
+
+This page IS the resume. Google and Apple engineers who
+review it will forward it to the hiring manager themselves.
+
+
+================================================================
+SECTION 7: MOTION AND ANIMATION
+================================================================
+
+All motion follows one rule: respond, don't decorate.
+
+Timing tokens:
+  Fast:    120ms  — button states, hover fills
+  Normal:  220ms  — panel slides, card transitions
+  Slow:    400ms  — page transitions, chart draw-on
+
+Easing: ease-out for things appearing (feels natural landing)
+        ease-in for things disappearing (feels intentional exit)
+
+Specific animations:
+  Score update: number flips (like a split-flap board) 300ms
+  Live dot: pulse scale 1.0 → 1.4 → 1.0, 2s loop, infinite
+  Momentum bar fill: smooth width transition, 800ms ease-out
+  Stat card entry: fade + translateY(8px → 0), staggered 40ms
+  Heatmap dot plot: dots appear one by one when tab opens
+  Chart line draw: stroke-dashoffset animation, 600ms ease-out
+  AI typing dots: scale bounce, 400ms stagger between 3 dots
+  Page transition: fade only, 180ms — never slide between pages
+
+Reduced motion: all animations off if prefers-reduced-motion
+                media query is set. Never skip this.
+
+
+================================================================
+SECTION 8: ICONOGRAPHY
+================================================================
+
+Free icon set: Lucide Icons (open source, MIT license)
+Available at: lucide.dev
+
+Icons used:
+  Live indicator: dot (custom CSS, not icon)
+  Goal:           trophy
+  Yellow card:    square (amber)
+  Red card:       square (red)
+  Substitution:   arrow-left-right
+  Injury:         activity
+  Home / Away:    house / plane
+  Stats:          bar-chart-2
+  Players:        users
+  Heatmap:        grid
+  AI:             sparkles
+  Follow:         bell
+  Share:          share-2
+  Search:         search
+  Settings:       settings
+  Filter:         sliders-horizontal
+
+Icon sizes:
+  Navigation: 20px
+  In-card: 16px
+  Hero / feature: 24px
+
+Never use emoji as icons in UI. Only Lucide.
+
+
+================================================================
+SECTION 9: FREE TOOLS TO EXECUTE THIS DESIGN
+================================================================
+
+Design:
+  Figma Free plan — up to 3 projects, sufficient for this
+  Use Figma Community: "Untitled UI" free kit for base
+  components, then override with Apex design tokens above
+
+Fonts:
+  Google Fonts — Barlow Condensed, Inter, JetBrains Mono
+  All free, self-hostable, no licensing cost
+
+Icons:
+  Lucide Icons — MIT license, free forever
+
+Color:
+  Coolors.co — free palette generator for team colors
+  Realtime Colors — free, preview palette on real UI
+
+Mockup preview:
+  Responsively App — free, preview all breakpoints at once
+  browser DevTools — always free
+
+Image assets:
+  Unsplash — free player/stadium photos for mockups
+  UI Faces — free avatar photos for prototyping
+
+Chart reference:
+  Recharts (free, MIT) — for web implementation
+  Victory Native (free, MIT) — for mobile charts
+
+Export:
+  Figma free plan allows PNG/SVG export without limit
+
+
+================================================================
+SECTION 10: DESIGN TOKENS SUMMARY (QUICK REFERENCE)
+================================================================
+
+COLORS
+  --color-bg:           #0D0D0F
+  --color-surface:      #161618
+  --color-surface-up:   #1E1E21
+  --color-border:       #2A2A2E
+  --color-accent:       #00FF87
+  --color-win:          #00C170
+  --color-loss:         #FF4D4D
+  --color-warning:      #FFB020
+  --color-info:         #4D9EFF
+  --color-text-1:       #F5F5F5
+  --color-text-2:       #9A9A9F
+  --color-text-3:       #5A5A62
+
+TYPOGRAPHY
+  --font-display:       'Barlow Condensed', sans-serif
+  --font-ui:            'Inter', sans-serif
+  --font-mono:          'JetBrains Mono', monospace
+
+RADIUS
+  --radius-sm:          6px
+  --radius-md:          10px
+  --radius-lg:          16px
+  --radius-full:        9999px
+
+SPACING
+  --space-xs: 4px  --space-sm: 8px  --space-md: 16px
+  --space-lg: 24px  --space-xl: 32px  --space-2xl: 48px
+
+
+================================================================
+END OF DESIGN PRD
+================================================================
