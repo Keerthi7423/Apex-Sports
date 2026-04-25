@@ -1,0 +1,61 @@
+================================================================
+DAY 1: MONOREPO & PROJECT INITIALIZATION - TECHNICAL BREAKDOWN
+================================================================
+
+Today's focus was on setting the bedrock for a scalable, enterprise-grade architecture using a Monorepo pattern. This is a critical skill for high-level software engineering roles.
+
+----------------------------------------------------------------
+1. THE MONOREPO PATTERN (npm Workspaces)
+----------------------------------------------------------------
+Why we used it:
+- Single Source of Truth: All services, apps, and shared logic live in one repository.
+- Shared Code: Instead of copying constants or logic between services, we created a '@apex/shared' package that all other services can import.
+- Atomic Changes: You can update a shared utility and see the impact across the entire system instantly without publishing npm packages.
+
+Interview Tip: "I used npm workspaces to manage a monorepo structure. This allowed us to share common logic and constants across 6 microservices and 2 frontend apps while keeping dependencies synchronized."
+
+----------------------------------------------------------------
+2. PROJECT STRUCTURE
+----------------------------------------------------------------
+- /apps: Contains the consumer-facing applications (Next.js for Web, Flutter for Mobile).
+- /services: Contains the backend microservices. Each service is independent and has its own 'package.json'.
+- /packages/shared: The utility belt of the project. It contains constants (like port numbers) and formatters that are used by both the frontend and backend.
+- /docker: Configuration for containerizing the services (for Day 21).
+- /scripts: Automation scripts (like the service initializer I built today).
+
+----------------------------------------------------------------
+3. SHARED UTILITIES & CONSTANTS
+----------------------------------------------------------------
+We initialized '@apex/shared' with:
+- Port Registry: Centralized management of service ports (4000-4005). This prevents port conflicts and makes service discovery easier.
+- Formatters: Standardized ways to display scores and dates, ensuring UI consistency across Web and Mobile.
+
+Interview Tip: "By centralizing our port registry and match statuses in a shared package, we eliminated 'magic numbers' and ensured that if we ever change a status name, it propagates across the entire stack automatically."
+
+----------------------------------------------------------------
+4. ENVIRONMENT CONFIGURATION
+----------------------------------------------------------------
+We set up a root '.env' and '.env.example'.
+- Microservices need to know where other services are. We defined variables like 'SERVICE_MATCH=http://localhost:4001'.
+- This makes the system "environment-aware". In production, we just swap these local URLs for Render.com or AWS URLs without changing a single line of code.
+
+----------------------------------------------------------------
+5. THE "SENIOR ENGINEER" TOUCH: INITIALIZATION SCRIPTS
+----------------------------------------------------------------
+Instead of manually creating 6 microservices, I wrote 'scripts/init-services.js'. 
+- Automation: It programmatically created the folder structure, 'package.json', and entry points for all services.
+- Consistency: Every service started with the exact same boilerplate, making the codebase predictable.
+
+----------------------------------------------------------------
+NEXT STEPS (Day 2):
+----------------------------------------------------------------
+Tomorrow, we build the API Gateway. This is the "Brain" of the entry point that will route traffic from the internet to these internal microservices.
+
+================================================================
+INTERVIEW QUESTIONS TO PREPARE:
+1. "Why use Microservices instead of a Monolith for a sports app?"
+   Answer: Scalability. During a major event (like the World Cup), the 'match-service' needs to scale to handle millions of live score requests, while the 'user-service' remains relatively quiet. Microservices allow us to scale them independently.
+
+2. "What are the benefits of a Monorepo?"
+   Answer: Simplified dependency management, easier cross-project refactoring, and a unified build/test pipeline.
+================================================================
