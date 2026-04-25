@@ -1,0 +1,81 @@
+================================================================
+DAY 2: API GATEWAY - CORE ROUTING & PROTECTION
+Project: Apex Sports Intelligence Platform
+================================================================
+
+1. OVERVIEW
+-----------
+On Day 2, we focused on building the "Front Door" of our microservices architecture: the API Gateway. In a microservices ecosystem, clients (Web, Mobile) should not talk to every service directly. Instead, they hit a single entry point (Gateway) which then routes the request to the appropriate internal service.
+
+2. KEY TECHNOLOGIES USED
+-------------------------
+- Express.js: The core web framework.
+- http-proxy-middleware: A powerful tool to proxy requests to other servers.
+- Morgan: HTTP request logger middleware for Node.js.
+- CORS: Middleware to enable Cross-Origin Resource Sharing.
+- Helmet: A security middleware that sets various HTTP headers to protect the app.
+- express-rate-limit: Basic rate-limiting to prevent abuse (DDoS/Brute Force).
+- dotenv: To manage environment-specific configurations.
+
+3. TECHNICAL BREAKDOWN (INTERVIEW READY)
+----------------------------------------
+
+A. The Gateway Pattern
+- Why do we need it? 
+  * Single Entry Point: Simplifies client-side logic.
+  * Cross-Cutting Concerns: Instead of implementing Auth, Logging, and Rate Limiting in every service, we do it once at the Gateway.
+  * Internal Abstraction: We can move or rename services without breaking the frontend API.
+
+B. Modular Architecture
+- Instead of a single massive index.js, we split the code into:
+  * /config: Centralized service URLs and environment variables.
+  * /middleware: Independent files for rate-limiting, auth, etc.
+  * /src/index.js: The "entry point" that assembles the pieces.
+- Interview Tip: This is called "Separation of Concerns". It makes the code easier to test, maintain, and scale.
+
+C. Reverse Proxying with Path Rewriting
+- Code Snippet:
+  app.use('/api/matches', createProxyMiddleware({ 
+    target: 'http://localhost:4001', 
+    pathRewrite: { '^/api/matches': '' } 
+  }));
+- Explanation: When the frontend calls `GET /api/matches/live`, the gateway receives it, strips `/api/matches`, and sends `GET /live` to the Match Service. This keeps internal service routes clean.
+
+D. Security & Protection
+- Helmet: Automatically sets headers like `X-Content-Type-Options`, `X-Frame-Options`, and `Content-Security-Policy`.
+- Rate Limiting: We limited requests to 100 per 15 minutes per IP. This is crucial for preventing bots from overwhelming the system.
+- CORS: Configured to allow our Next.js and Flutter apps to communicate with the API without browser "Same-Origin" blocks.
+
+E. Error Handling (Bad Gateway)
+- We implemented an `onError` handler in the proxy. If a downstream service (e.g., Match Service) is down, the Gateway returns a 502 Bad Gateway status instead of a generic hang or crash.
+
+4. INTERVIEW QA
+---------------
+
+Q1: What is a Reverse Proxy?
+A1: A reverse proxy is a server that sits in front of backend servers and forwards client requests to them. Unlike a forward proxy (which hides the client), a reverse proxy hides the backend servers.
+
+Q2: How do you handle Service Discovery in this setup?
+A2: Currently, we use Environment Variables (.env) for service discovery (Hardcoded URLs). In a production-grade system like Kubernetes, we would use DNS-based service discovery (e.g., http://match-service:4001).
+
+Q3: Why use Morgan in a Gateway?
+A3: To track traffic flow. It helps us see which routes are being hit, what status codes are being returned, and the latency of requests across the system.
+
+Q4: What happens if the Gateway fails?
+A4: The Gateway is a "Single Point of Failure" (SPOF). To mitigate this in production, we would run multiple instances of the Gateway behind a Load Balancer (like AWS ALB or Nginx).
+
+5. COMMANDS TO RUN & TEST
+--------------------------
+# Start the gateway
+cd services/gateway
+npm run dev
+
+# Test health check
+curl http://localhost:4000/health
+
+# Verify routing (Should give 502 if Match service is down)
+curl http://localhost:4000/api/matches
+
+================================================================
+END OF DAY 2 DOCUMENTATION
+================================================================
