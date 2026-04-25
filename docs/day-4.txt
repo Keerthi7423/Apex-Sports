@@ -1,0 +1,102 @@
+================================================================
+DAY 4: MATCH SERVICE - BASE & SCHEMA IMPLEMENTATION
+================================================================
+
+In Day 4 of the Apex Sports Intelligence Platform development, we focused on building the foundational microservice for Match data. This service is responsible for managing match schedules, live scores, and historical data.
+
+----------------------------------------------------------------
+1. TECHNICAL ARCHITECTURE
+----------------------------------------------------------------
+The Match Service is a standalone Node.js/Express microservice that communicates with a MongoDB database. 
+
+Key Components:
+- Express.js: High-performance web framework for building the API.
+- Mongoose: ODM (Object Data Modeling) library for MongoDB, providing schema-based solutions to model application data.
+- MongoDB: NoSQL database used to store flexible match documents (stats, events, team info).
+- ES Modules: Used modern 'import/export' syntax for better code organization and future-proofing.
+
+----------------------------------------------------------------
+2. DATA MODELING (SCHEMA DESIGN)
+----------------------------------------------------------------
+We defined a comprehensive 'Match' schema in `src/models/Match.js`.
+
+Key Schema Fields:
+- _id: Custom string ID (from external Sports APIs).
+- sport: String (e.g., 'Soccer').
+- homeTeam / awayTeam: Nested objects containing id, name, logo, and primary color.
+- score: Unified object { home, away, ht } for better score management.
+- status: Enum field [upcoming, live, finished, postponed].
+- kickoff: Date field for match start time.
+- momentum: Array of numbers representing the flow of the game over time.
+- stats: A complex nested schema tracking possession, shots, passes, and corners.
+- events: An array of Event objects tracking goals, cards, and substitutions.
+- fetchedAt: Date field with a TTL (Time To Live) index of 15 seconds to ensure data freshness.
+
+Interview Tip: Explain why we use a TTL index. In sports applications, data like live scores becomes stale very quickly. A TTL index of 15 seconds tells MongoDB to automatically delete the record if it hasn't been updated, forcing the service to fetch fresh data from the source API. This is a common pattern for "Live" systems.
+
+
+----------------------------------------------------------------
+3. API ENDPOINTS
+----------------------------------------------------------------
+We implemented two core RESTful endpoints:
+
+- GET /api/matches: 
+  - Retrieves a list of matches.
+  - Supports filtering by 'status' (e.g., ?status=live) and 'league'.
+  - Uses .sort({ startTime: 1 }) to ensure the timeline makes sense.
+
+- GET /api/matches/:id:
+  - Retrieves detailed information for a specific match by its MongoDB ObjectId.
+  - Returns 404 if the match doesn't exist.
+
+----------------------------------------------------------------
+4. DATABASE SEEDING
+----------------------------------------------------------------
+To facilitate testing and frontend development, we implemented a `seedData.js` utility.
+- It checks if the collection is empty upon service startup.
+- If empty, it injects mock data for 'Live', 'Scheduled', and 'Finished' matches.
+- This ensures developers always have data to work with without manually inserting it.
+
+----------------------------------------------------------------
+5. GATEWAY INTEGRATION
+----------------------------------------------------------------
+The Match Service is integrated into the system via the API Gateway.
+- Gateway Port: 4000
+- Match Service Port: 4001
+- Routing: Any request to `http://localhost:4000/api/matches` is proxied to `http://localhost:4001/api/matches`.
+- This abstraction allows the frontend to talk to a single entry point (the Gateway) without knowing the internal network structure of the microservices.
+
+----------------------------------------------------------------
+INTERVIEW PREP QUESTIONS & ANSWERS
+----------------------------------------------------------------
+
+Q1: Why did you choose MongoDB for the Match Service?
+A1: Sports data is inherently hierarchical and varies by sport. A document-oriented database like MongoDB allows us to store complex structures (nested stats, arrays of events) naturally. It also allows the schema to evolve easily if we add new sports or new types of tracking data in the future.
+
+Q2: How do you handle service-to-service communication?
+A2: Currently, we use the API Gateway to route external traffic. For internal service-to-service calls (like Notification Service needing Match data), we will eventually use RabbitMQ for asynchronous events, but for synchronous requests, we use simple HTTP calls between services.
+
+Q3: Explain the role of the 'status' enum in your schema.
+A3: The 'status' field is critical for the UI. It allows the frontend to distinguish between live games (requiring WebSocket updates), upcoming games (requiring countdowns), and past games (static results). Using an Enum ensures data integrity at the database level.
+
+Q4: What is the benefit of using ES Modules (type: module)?
+A4: ES Modules are the official standard for JavaScript. They provide better static analysis for tools (tree-shaking), better performance in some environments, and a cleaner syntax compared to CommonJS (require/module.exports).
+
+----------------------------------------------------------------
+TROUBLESHOOTING: ECONNREFUSED 27017
+----------------------------------------------------------------
+If you see this error, it means the Match Service cannot find a running instance of MongoDB. 
+
+How to fix:
+1. Ensure MongoDB is installed and running locally.
+2. Use the provided Docker Compose file:
+   - Navigate to the `docker/` folder.
+   - Run: `docker-compose up -d`
+3. If you are using a remote MongoDB (like Atlas), update the `MONGODB_URI` in your root `.env` file.
+
+Interview Tip: Mentioning that you know how to debug connection errors shows you have practical experience. "I check the connection string, ensure the database process is running, and verify that there are no firewall or network issues blocking the port (27017)."
+
+================================================================
+END OF DAY 4 DOCUMENTATION
+================================================================
+
