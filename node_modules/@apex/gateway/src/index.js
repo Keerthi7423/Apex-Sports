@@ -12,6 +12,7 @@ const {
   NOTIF_SERVICE_URL 
 } = require('./config/services');
 const apiLimiter = require('./middleware/rateLimit');
+const { verifyToken } = require('./middleware/auth');
 
 const app = express();
 
@@ -50,9 +51,9 @@ const proxyOptions = (target) => ({
 // Route Definitions
 app.use('/api/matches', apiLimiter, createProxyMiddleware(proxyOptions(MATCH_SERVICE_URL)));
 app.use('/api/players', apiLimiter, createProxyMiddleware(proxyOptions(PLAYER_SERVICE_URL)));
-app.use('/api/ai', apiLimiter, createProxyMiddleware(proxyOptions(AI_SERVICE_URL)));
-app.use('/api/users', apiLimiter, createProxyMiddleware(proxyOptions(USER_SERVICE_URL)));
-app.use('/api/notifications', apiLimiter, createProxyMiddleware(proxyOptions(NOTIF_SERVICE_URL)));
+app.use('/api/ai', apiLimiter, verifyToken, createProxyMiddleware(proxyOptions(AI_SERVICE_URL)));
+app.use('/api/users', apiLimiter, verifyToken, createProxyMiddleware(proxyOptions(USER_SERVICE_URL)));
+app.use('/api/notifications', apiLimiter, verifyToken, createProxyMiddleware(proxyOptions(NOTIF_SERVICE_URL)));
 
 // 404 Handler
 app.use((req, res) => {
