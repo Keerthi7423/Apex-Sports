@@ -1,0 +1,81 @@
+================================================================
+DAY 3: FIREBASE AUTH & GATEWAY MIDDLEWARE
+Project: Apex Sports Intelligence Platform
+================================================================
+
+1. OVERVIEW
+-----------
+On Day 3, we implemented the Security Layer for our microservices architecture. While the Gateway routes traffic, it must also ensure that the traffic is authorized. We integrated Firebase Admin SDK to verify Google/Firebase ID tokens centrally at the Gateway. This ensures that sensitive downstream services (like AI and User services) only receive requests from authenticated users.
+
+2. KEY TECHNOLOGIES USED
+-------------------------
+- Firebase Admin SDK: The official Node.js library for interacting with Firebase from privileged environments.
+- JSON Web Tokens (JWT): The underlying technology for Firebase ID tokens.
+- Express Middleware: Custom functions that execute before the request reaches the proxy layer.
+- dotenv: To securely handle Firebase credentials (Project ID, Client Email, Private Key).
+
+3. TECHNICAL BREAKDOWN (INTERVIEW READY)
+----------------------------------------
+
+A. Centralized Authentication (The "Auth Proxy" Pattern)
+- Why do we do this?
+  * Scalability: Instead of every microservice (Match, Player, AI) needing to verify the user, the Gateway does it once. 
+  * Performance: Downstream services can trust the `x-user-id` or `req.user` object passed by the Gateway, reducing redundant database lookups or API calls to Firebase.
+  * Security: It creates a "Hardened Perimeter." If a request isn't authenticated, it never even reaches the internal network.
+
+B. Firebase Admin SDK Integration
+- We created a dedicated config file (`/config/firebase.js`) to initialize the SDK.
+- Crucially, we handled the "Private Key" formatting issue (replacing `\\n` with actual newlines), which is a common pitfall when storing keys in `.env` files.
+- Interview Tip: Initializing the SDK as a singleton (checking `admin.apps.length`) prevents multiple connection errors during hot-reloads in development.
+
+C. The `verifyToken` Middleware
+- The middleware looks for the `Authorization: Bearer <token>` header.
+- It uses `admin.auth().verifyIdToken()` to:
+  1. Check the signature (is it from Firebase?).
+  2. Check the expiration (is the token still valid?).
+  3. Decode the payload (who is this user?).
+- If successful, the decoded user object is attached to `req.user`, making it available to the next middleware or the proxy.
+
+D. Selective Route Protection
+- Not all routes are created equal. We applied the `verifyToken` middleware selectively:
+  * Public: `/health`, `/api/matches`, `/api/players` (General sports data).
+  * Protected: `/api/ai` (Expensive LLM calls), `/api/users` (Personal data), `/api/notifications` (Subscription management).
+- Interview Tip: This is called "Least Privilege Access." We only restrict what is necessary to provide a good UX while keeping the system secure.
+
+E. Passing Context to Downstream Services
+- When the Gateway proxies a request, it can inject headers. 
+- In our setup, although we haven't implemented it yet, the next step would be to pass `x-user-id: decodedToken.uid` to services like `user-service` so they know which user's data to fetch without re-verifying the token.
+
+4. INTERVIEW QA
+---------------
+
+Q1: Why use Firebase Admin SDK on the backend instead of just checking the token on the frontend?
+A1: Frontend security is easily bypassed. Any user can modify frontend code. Verifying the token on the backend (Gateway) is the ONLY way to guarantee the user's identity and permissions.
+
+Q2: What is the difference between an ID Token and an Access Token?
+A2: In Firebase, the ID Token (JWT) is used to prove identity. It contains user info like UID and email. An Access Token (in OAuth2) is used to grant permission to specific resources. Firebase uses ID Tokens for auth.
+
+Q3: How do you handle expired tokens in this architecture?
+A3: The Firebase Client SDK (on Web/Mobile) automatically refreshes tokens. If a token expires and the client sends it, our `verifyToken` middleware will catch the error from `verifyIdToken()` and return a 403 Forbidden, signaling the client to refresh and retry.
+
+Q4: Why not put Auth in every microservice?
+A4: "Don't Repeat Yourself" (DRY). Putting auth in every service creates "Auth Bloat." If we decide to switch from Firebase to Auth0 or a custom JWT solution, we only have to change the code in ONE place (the Gateway) instead of six.
+
+5. COMMANDS TO RUN & TEST
+--------------------------
+# 1. Install dependencies
+cd services/gateway
+npm install
+
+# 2. Start the gateway
+npm run dev
+
+# 3. Test a protected route (Should give 401 Unauthorized)
+curl -X POST http://localhost:4000/api/ai/ask
+
+# 4. Test a public route (Should work or give 502 if downstream is down)
+curl http://localhost:4000/api/matches
+
+================================================================
+END OF DAY 3 DOCUMENTATION
+================================================================
