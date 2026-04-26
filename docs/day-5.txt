@@ -1,0 +1,85 @@
+================================================================
+DAY 5: MATCH SERVICE - LIVE DATA & WEBSOCKETS
+================================================================
+
+Today we focused on making the Match Service "live". This is the heart of the Apex Sports platform, ensuring that fans get score updates as they happen without refreshing the page.
+
+Key Concepts Implemented:
+1. Real-time Communication (WebSockets)
+2. Background Polling (Cron Jobs)
+3. Rate Limiting Outbound Requests (P-Queue)
+4. Message Brokering (Redis Pub/Sub)
+5. API Gateway Proxying (WS Support)
+
+----------------------------------------------------------------
+1. WEBSOCKET HUB (wsHub.js)
+----------------------------------------------------------------
+Why WebSockets?
+HTTP is "request-response" (Client asks, Server answers). For live scores, we need "Push" (Server tells Client when a goal happens). WebSockets keep a persistent connection open.
+
+Technical Implementation:
+- We used the 'ws' library.
+- We implemented a "Room" system. When a user views match 'm1', they join the 'm1' room.
+- broadcast(matchId, data): This method iterates through all clients in a specific room and sends them the update. This is highly efficient because we only send data to interested users.
+
+Interview Tip: Explain the difference between Polling vs. WebSockets. WebSockets reduce overhead and provide lower latency for high-frequency updates.
+
+----------------------------------------------------------------
+2. LIVE POLLER (livePoller.js)
+----------------------------------------------------------------
+How we get data:
+Since we don't have a direct data feed from stadium sensors, we poll an external Sports API (like API-Football) every 15 seconds.
+
+Implementation:
+- node-cron: Used to schedule a task every 15 seconds ('*/15 * * * * *').
+- Atomicity: We check 'isPolling' to ensure if one request takes too long, we don't start another one and overlap.
+- Data Flow: Fetch -> Update DB -> Broadcast to WS Hub -> Publish to Redis.
+
+----------------------------------------------------------------
+3. SPORTS API SERVICE (sportsApiService.js)
+----------------------------------------------------------------
+Challenges:
+External APIs often have rate limits (e.g., 10 requests per minute). If we just fetch whenever, we might get blocked.
+
+Solution: p-queue
+- We used 'p-queue' to ensure we never exceed a specific concurrency or frequency. 
+- This service acts as a clean wrapper, separating the API-specific logic (headers, URL structures) from our business logic.
+
+----------------------------------------------------------------
+4. REDIS PUBLISHER (redisPublisher.js)
+----------------------------------------------------------------
+Microservices Decoupling:
+The Match Service shouldn't care about sending Push Notifications or Emails. Its job is just "Matches".
+- When a goal happens, the Match Service publishes a message to a Redis channel called 'match-events'.
+- The Notification Service (built on Day 9/10) will listen to this channel and handle the actual push delivery.
+- This is called "Event-Driven Architecture".
+
+----------------------------------------------------------------
+5. GATEWAY WS PROXY
+----------------------------------------------------------------
+The "Single Entry Point" rule:
+The Frontend should only ever talk to port 4000 (Gateway). It shouldn't know port 4001 exists.
+- We updated the Gateway to handle the 'upgrade' event.
+- When a client hits 'ws://localhost:4000/ws/live/123', the Gateway recognizes the WS protocol and tunnels the connection directly to the Match Service.
+
+----------------------------------------------------------------
+INTERVIEW QUESTIONS YOU CAN NOW ANSWER:
+----------------------------------------------------------------
+Q: How do you handle real-time updates in a microservices architecture?
+A: I use WebSockets for client-server communication and a Message Broker like Redis for inter-service communication. This keeps services decoupled.
+
+Q: What happens if your external data source has a strict rate limit?
+A: I implement a request queue using 'p-queue' with defined concurrency and intervals to ensure the application stays within the provider's limits.
+
+Q: Why use rooms in WebSockets?
+A: Rooms allow us to segment traffic. Instead of broadcasting a goal in a Premier League match to users watching NBA, we only send it to the specific match room, saving bandwidth and processing power.
+
+----------------------------------------------------------------
+FILE SUMMARY:
+- services/match-service/src/services/wsHub.js
+- services/match-service/src/services/livePoller.js
+- services/match-service/src/services/sportsApiService.js
+- services/match-service/src/services/redisPublisher.js
+- services/match-service/src/index.js (Updated)
+- services/gateway/src/index.js (Updated)
+================================================================
